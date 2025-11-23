@@ -1,8 +1,6 @@
 class TranscriptionService {
   private static getBackendUrl(): string {
-    const url = process.env.NODE_ENV === 'production'
-      ? process.env.NEXT_PUBLIC_BACKEND_URL_PROD || ''
-      : process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
+    const url = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
     
     // Remove trailing slash to prevent double slashes
     return url.replace(/\/+$/, '');
