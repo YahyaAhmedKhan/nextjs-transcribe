@@ -55,10 +55,11 @@ export default function Home() {
             }}
             maxSize={25 * 1024 * 1024} // 25MB
             onDrop={handleDrop}
+            src={audioFile ? [audioFile] : undefined}
             className="min-h-[200px]"
           >
             <DropzoneEmptyState />
-            <DropzoneContent src={audioFile ? [audioFile] : undefined} />
+            <DropzoneContent />
           </Dropzone>
 
           {audioFile && (
