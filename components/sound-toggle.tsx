@@ -16,7 +16,7 @@ export function SoundToggle({ enabled, onToggle }: SoundToggleProps) {
       variant="outline"
       size="icon"
       onClick={() => onToggle(!enabled)}
-      className="h-9 w-9 border-zinc-300 dark:border-zinc-700"
+      className="h-9 w-9 border-zinc-300 dark:border-zinc-700 cursor-pointer"
     >
       {enabled ? (
         <Volume2 className="h-4 w-4" />
