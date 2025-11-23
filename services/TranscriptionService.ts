@@ -1,5 +1,12 @@
 class TranscriptionService {
-  private static readonly BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
+  private static getBackendUrl(): string {
+    const url = process.env.NODE_ENV === 'production'
+      ? process.env.NEXT_PUBLIC_BACKEND_URL_PROD || ''
+      : process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
+    
+    // Remove trailing slash to prevent double slashes
+    return url.replace(/\/+$/, '');
+  }
 
   /**
    * Transcribe an audio file using the backend API
@@ -10,7 +17,7 @@ class TranscriptionService {
     const formData = new FormData();
     formData.append('audio', audioFile);
 
-    const response = await fetch(`${this.BACKEND_URL}/transcribe`, {
+    const response = await fetch(`${this.getBackendUrl()}/transcribe`, {
       method: 'POST',
       body: formData,
     });
