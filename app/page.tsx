@@ -4,19 +4,61 @@ import { useState } from 'react';
 import { Dropzone, DropzoneContent, DropzoneEmptyState } from '@/components/ui/shadcn-io/dropzone';
 import TranscriptionService from '@/services/TranscriptionService';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/theme-toggle';
+import { SoundToggle } from '@/components/sound-toggle';
+import { Switch } from '@/components/ui/switch';
+import { toast } from 'sonner';
 
 export default function Home() {
-  console.log(process.env.NEXT_PUBLIC_BACKEND_URL);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [transcription, setTranscription] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
+  const [autoTranscribe, setAutoTranscribe] = useState(true);
+  const [soundEnabled, setSoundEnabled] = useState(true);
 
-  const handleDrop = (acceptedFiles: File[]) => {
+  const playChime = () => {
+    if (!soundEnabled) return;
+    try {
+      const audio = new Audio('/sounds/notif.mp3');
+      audio.volume = 0.03;
+      audio.play().catch(err => {
+        console.error('Audio play failed:', err);
+        // Fallback to system notification sound
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('Transcription Complete');
+        }
+      });
+    } catch (err) {
+      console.error('Audio creation failed:', err);
+    }
+  };
+
+  const handleDrop = async (acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
-      setAudioFile(acceptedFiles[0]);
+      const file = acceptedFiles[0];
+      setAudioFile(file);
       setTranscription('');
       setError('');
+      
+      // Automatically start transcription if enabled
+      if (autoTranscribe) {
+        setLoading(true);
+        try {
+          const text = await TranscriptionService.transcribeAudio(file);
+          setTranscription(text);
+          // Play chime and show success toast with file name and preview
+          playChime();
+          const preview = text.slice(0, 50) + (text.length > 50 ? '...' : '');
+          toast.success('Transcription Complete', {
+            description: `${file.name}\n"${preview}"`,
+          });
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Failed to transcribe audio');
+        } finally {
+          setLoading(false);
+        }
+      }
     }
   };
 
@@ -30,6 +72,12 @@ export default function Home() {
     try {
       const text = await TranscriptionService.transcribeAudio(audioFile);
       setTranscription(text);
+      // Play chime and show success toast with file name and preview
+      playChime();
+      const preview = text.slice(0, 50) + (text.length > 50 ? '...' : '');
+      toast.success('Transcription Complete', {
+        description: `${audioFile.name}\n"${preview}"`,
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to transcribe audio');
     } finally {
@@ -39,6 +87,10 @@ export default function Home() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black p-8">
+      <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
+        <ThemeToggle />
+        <SoundToggle enabled={soundEnabled} onToggle={setSoundEnabled} />
+      </div>
       <main className="w-full max-w-2xl space-y-8">
         <div className="text-center space-y-2">
           <h1 className="text-4xl font-bold tracking-tight text-black dark:text-zinc-50">
@@ -50,6 +102,21 @@ export default function Home() {
         </div>
 
         <div className="space-y-4">
+          <div className="flex items-center justify-between rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
+            <div className="flex flex-col gap-1">
+              <span className="font-medium text-sm text-black dark:text-zinc-50">
+                Auto-transcribe on upload
+              </span>
+              <span className="text-xs text-zinc-600 dark:text-zinc-400">
+                {autoTranscribe ? 'Transcription starts automatically' : 'Use button to transcribe'}
+              </span>
+            </div>
+            <Switch
+              checked={autoTranscribe}
+              onCheckedChange={setAutoTranscribe}
+            />
+          </div>
+
           <Dropzone
             accept={{
               'audio/*': ['.mp3', '.wav', '.ogg', '.m4a', '.flac'],
@@ -63,7 +130,7 @@ export default function Home() {
             <DropzoneContent />
           </Dropzone>
 
-          {audioFile && (
+          {audioFile && !autoTranscribe && (
             <Button
               onClick={handleTranscribe}
               disabled={loading}
