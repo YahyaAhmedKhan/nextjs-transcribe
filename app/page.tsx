@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import { Mic, Square } from 'lucide-react';
 import { Dropzone, DropzoneContent, DropzoneEmptyState } from '@/components/ui/shadcn-io/dropzone';
 import TranscriptionService from '@/services/TranscriptionService';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,90 @@ export default function Home() {
   const [error, setError] = useState<string>('');
   const [autoTranscribe, setAutoTranscribe] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const audioFile = new File([audioBlob], `recording-${Date.now()}.webm`, { type: 'audio/webm' });
+        
+        // Stop all tracks
+        stream.getTracks().forEach(track => track.stop());
+        
+        // Clear timer
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+        setRecordingTime(0);
+        
+        // Set the file and handle it like a dropped file
+        setAudioFile(audioFile);
+        setTranscription('');
+        setError('');
+        
+        if (autoTranscribe) {
+          setLoading(true);
+          try {
+            const text = await TranscriptionService.transcribeAudio(audioFile);
+            setTranscription(text);
+            playChime();
+            const preview = text.slice(0, 50) + (text.length > 50 ? '...' : '');
+            toast.success('Transcription Complete', {
+              description: `${audioFile.name}\n"${preview}"`,
+            });
+          } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to transcribe audio');
+          } finally {
+            setLoading(false);
+          }
+        }
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      
+      // Start timer
+      timerRef.current = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+      
+    } catch (err) {
+      console.error('Error accessing microphone:', err);
+      toast.error('Microphone Access Denied', {
+        description: 'Please allow microphone access to record audio.',
+      });
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const playChime = () => {
     if (!soundEnabled) return;
@@ -117,18 +202,51 @@ export default function Home() {
             />
           </div>
 
-          <Dropzone
-            accept={{
-              'audio/*': ['.mp3', '.wav', '.ogg', '.m4a', '.flac'],
-            }}
-            maxSize={25 * 1024 * 1024} // 25MB
-            onDrop={handleDrop}
-            src={audioFile ? [audioFile] : undefined}
-            className="min-h-[200px]"
-          >
-            <DropzoneEmptyState />
-            <DropzoneContent />
-          </Dropzone>
+          {!isRecording ? (
+            <Button
+              onClick={startRecording}
+              variant="outline"
+              className="w-full border-zinc-300 dark:border-zinc-700 cursor-pointer"
+              size="lg"
+            >
+              <Mic className="mr-2 h-5 w-5" />
+              Record Audio
+            </Button>
+          ) : null}
+
+          {isRecording ? (
+            <div className="rounded-lg border border-red-500 dark:border-red-600 bg-red-50 dark:bg-red-950/30 p-8 min-h-[200px] flex flex-col items-center justify-center gap-4">
+              <div className="flex items-center gap-3">
+                <div className="h-4 w-4 bg-red-500 rounded-full animate-pulse" />
+                <span className="text-2xl font-mono font-bold text-red-600 dark:text-red-400">
+                  {formatTime(recordingTime)}
+                </span>
+              </div>
+              <p className="text-sm text-red-600 dark:text-red-400">Recording in progress...</p>
+              <Button
+                onClick={stopRecording}
+                variant="destructive"
+                size="lg"
+                className="cursor-pointer"
+              >
+                <Square className="mr-2 h-5 w-5 fill-current" />
+                Stop Recording
+              </Button>
+            </div>
+          ) : (
+            <Dropzone
+              accept={{
+                'audio/*': ['.mp3', '.wav', '.ogg', '.m4a', '.flac'],
+              }}
+              maxSize={25 * 1024 * 1024} // 25MB
+              onDrop={handleDrop}
+              src={audioFile ? [audioFile] : undefined}
+              className="min-h-[200px]"
+            >
+              <DropzoneEmptyState />
+              <DropzoneContent />
+            </Dropzone>
+          )}
 
           {audioFile && !autoTranscribe && (
             <Button
