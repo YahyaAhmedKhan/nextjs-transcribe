@@ -6,6 +6,7 @@ import TranscriptionService from '@/services/TranscriptionService';
 import { Button } from '@/components/ui/button';
 
 export default function Home() {
+  console.log(process.env.NEXT_PUBLIC_BACKEND_URL);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [transcription, setTranscription] = useState<string>('');
   const [loading, setLoading] = useState(false);
