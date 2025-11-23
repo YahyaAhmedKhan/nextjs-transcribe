@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { Mic, Square } from 'lucide-react';
+import { Mic, Square, Download } from 'lucide-react';
 import { Dropzone, DropzoneContent, DropzoneEmptyState } from '@/components/ui/shadcn-io/dropzone';
 import TranscriptionService from '@/services/TranscriptionService';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ export default function Home() {
   const [error, setError] = useState<string>('');
   const [autoTranscribe, setAutoTranscribe] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [translateToEnglish, setTranslateToEnglish] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -58,7 +59,7 @@ export default function Home() {
         if (autoTranscribe) {
           setLoading(true);
           try {
-            const text = await TranscriptionService.transcribeAudio(audioFile);
+            const text = await TranscriptionService.transcribeAudio(audioFile, translateToEnglish);
             setTranscription(text);
             playChime();
             const preview = text.slice(0, 50) + (text.length > 50 ? '...' : '');
@@ -102,6 +103,18 @@ export default function Home() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const downloadAudioFile = () => {
+    if (!audioFile) return;
+    const url = URL.createObjectURL(audioFile);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = audioFile.name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const playChime = () => {
     if (!soundEnabled) return;
     try {
@@ -130,7 +143,7 @@ export default function Home() {
       if (autoTranscribe) {
         setLoading(true);
         try {
-          const text = await TranscriptionService.transcribeAudio(file);
+          const text = await TranscriptionService.transcribeAudio(file, translateToEnglish);
           setTranscription(text);
           // Play chime and show success toast with file name and preview
           playChime();
@@ -155,7 +168,7 @@ export default function Home() {
     setTranscription('');
 
     try {
-      const text = await TranscriptionService.transcribeAudio(audioFile);
+      const text = await TranscriptionService.transcribeAudio(audioFile, translateToEnglish);
       setTranscription(text);
       // Play chime and show success toast with file name and preview
       playChime();
@@ -187,19 +200,36 @@ export default function Home() {
         </div>
 
         <div className="space-y-4">
-          <div className="flex items-center justify-between rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
-            <div className="flex flex-col gap-1">
-              <span className="font-medium text-sm text-black dark:text-zinc-50">
-                Auto-transcribe on upload
-              </span>
-              <span className="text-xs text-zinc-600 dark:text-zinc-400">
-                {autoTranscribe ? 'Transcription starts automatically' : 'Use button to transcribe'}
-              </span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="flex items-center justify-between rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
+              <div className="flex flex-col gap-1">
+                <span className="font-medium text-sm text-black dark:text-zinc-50">
+                  Auto-transcribe on upload
+                </span>
+                <span className="text-xs text-zinc-600 dark:text-zinc-400">
+                  {autoTranscribe ? 'Transcription starts automatically' : 'Use button to transcribe'}
+                </span>
+              </div>
+              <Switch
+                checked={autoTranscribe}
+                onCheckedChange={setAutoTranscribe}
+              />
             </div>
-            <Switch
-              checked={autoTranscribe}
-              onCheckedChange={setAutoTranscribe}
-            />
+
+            <div className="flex items-center justify-between rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4">
+              <div className="flex flex-col gap-1">
+                <span className="font-medium text-sm text-black dark:text-zinc-50">
+                  Translate to English
+                </span>
+                <span className="text-xs text-zinc-600 dark:text-zinc-400">
+                  {translateToEnglish ? 'Will translate to English' : 'Original language'}
+                </span>
+              </div>
+              <Switch
+                checked={translateToEnglish}
+                onCheckedChange={setTranslateToEnglish}
+              />
+            </div>
           </div>
 
           {!isRecording ? (
@@ -249,13 +279,35 @@ export default function Home() {
           )}
 
           {audioFile && !autoTranscribe && (
+            <div className="flex gap-2">
+              <Button
+                onClick={handleTranscribe}
+                disabled={loading}
+                className="flex-1"
+                size="lg"
+              >
+                {loading ? 'Transcribing...' : 'Transcribe Audio'}
+              </Button>
+              <Button
+                onClick={downloadAudioFile}
+                variant="outline"
+                size="lg"
+                className="cursor-pointer border-zinc-300 dark:border-zinc-700"
+              >
+                <Download className="h-5 w-5" />
+              </Button>
+            </div>
+          )}
+
+          {audioFile && autoTranscribe && (
             <Button
-              onClick={handleTranscribe}
-              disabled={loading}
-              className="w-full"
+              onClick={downloadAudioFile}
+              variant="outline"
               size="lg"
+              className="w-full cursor-pointer border-zinc-300 dark:border-zinc-700"
             >
-              {loading ? 'Transcribing...' : 'Transcribe Audio'}
+              <Download className="mr-2 h-5 w-5" />
+              Download Audio File
             </Button>
           )}
         </div>

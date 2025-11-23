@@ -9,11 +9,15 @@ class TranscriptionService {
   /**
    * Transcribe an audio file using the backend API
    * @param audioFile - The audio file to transcribe
+   * @param translate - Whether to translate to English
    * @returns Promise with the transcription text
    */
-  static async transcribeAudio(audioFile: File): Promise<string> {
+  static async transcribeAudio(audioFile: File, translate: boolean = false): Promise<string> {
     const formData = new FormData();
     formData.append('audio', audioFile);
+    if (translate) {
+      formData.append('language', 'english');
+    }
 
     const response = await fetch(`${this.getBackendUrl()}/transcribe`, {
       method: 'POST',
