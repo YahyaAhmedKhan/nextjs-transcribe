@@ -5,8 +5,7 @@ import { Mic, Square, Download, Trash2, Copy, Check } from 'lucide-react';
 import { Dropzone, DropzoneContent, DropzoneEmptyState } from '@/components/ui/shadcn-io/dropzone';
 import TranscriptionService from '@/services/TranscriptionService';
 import { Button } from '@/components/ui/button';
-import { ThemeToggle } from '@/components/theme-toggle';
-import { SoundToggle } from '@/components/sound-toggle';
+import { Navbar } from '@/components/navbar';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 
@@ -212,12 +211,10 @@ export default function Home() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black p-8">
-      <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
-        <ThemeToggle />
-        <SoundToggle enabled={soundEnabled} onToggle={setSoundEnabled} />
-      </div>
-      <main className="w-full max-w-2xl space-y-8">
+    <>
+      <Navbar soundEnabled={soundEnabled} onSoundToggle={setSoundEnabled} />
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black p-8 pt-24">
+        <main className="w-full max-w-2xl space-y-8">
         <div className="text-center space-y-2">
           <h1 className="text-4xl font-bold tracking-tight text-black dark:text-zinc-50">
             Audio Transcription
@@ -390,5 +387,6 @@ export default function Home() {
         )}
       </main>
     </div>
+    </>
   );
 }
