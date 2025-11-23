@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { Mic, Square, Download } from 'lucide-react';
+import { Mic, Square, Download, Trash2, Copy, Check } from 'lucide-react';
 import { Dropzone, DropzoneContent, DropzoneEmptyState } from '@/components/ui/shadcn-io/dropzone';
 import TranscriptionService from '@/services/TranscriptionService';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,7 @@ export default function Home() {
   const [translateToEnglish, setTranslateToEnglish] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+  const [copied, setCopied] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -58,15 +59,18 @@ export default function Home() {
         
         if (autoTranscribe) {
           setLoading(true);
+          toast.loading('Uploading and transcribing...', { id: 'transcription' });
           try {
             const text = await TranscriptionService.transcribeAudio(audioFile, translateToEnglish);
             setTranscription(text);
             playChime();
             const preview = text.slice(0, 50) + (text.length > 50 ? '...' : '');
             toast.success('Transcription Complete', {
+              id: 'transcription',
               description: `${audioFile.name}\n"${preview}"`,
             });
           } catch (err) {
+            toast.dismiss('transcription');
             setError(err instanceof Error ? err.message : 'Failed to transcribe audio');
           } finally {
             setLoading(false);
@@ -115,6 +119,24 @@ export default function Home() {
     URL.revokeObjectURL(url);
   };
 
+  const clearAudioFile = () => {
+    setAudioFile(null);
+    setTranscription('');
+    setError('');
+  };
+
+  const copyToClipboard = async () => {
+    if (!transcription) return;
+    try {
+      await navigator.clipboard.writeText(transcription);
+      setCopied(true);
+      toast.success('Copied to clipboard');
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      toast.error('Failed to copy to clipboard');
+    }
+  };
+
   const playChime = () => {
     if (!soundEnabled) return;
     try {
@@ -142,6 +164,7 @@ export default function Home() {
       // Automatically start transcription if enabled
       if (autoTranscribe) {
         setLoading(true);
+        toast.loading('Uploading and transcribing...', { id: 'transcription' });
         try {
           const text = await TranscriptionService.transcribeAudio(file, translateToEnglish);
           setTranscription(text);
@@ -149,9 +172,11 @@ export default function Home() {
           playChime();
           const preview = text.slice(0, 50) + (text.length > 50 ? '...' : '');
           toast.success('Transcription Complete', {
+            id: 'transcription',
             description: `${file.name}\n"${preview}"`,
           });
         } catch (err) {
+          toast.dismiss('transcription');
           setError(err instanceof Error ? err.message : 'Failed to transcribe audio');
         } finally {
           setLoading(false);
@@ -166,6 +191,7 @@ export default function Home() {
     setLoading(true);
     setError('');
     setTranscription('');
+    toast.loading('Uploading and transcribing...', { id: 'transcription' });
 
     try {
       const text = await TranscriptionService.transcribeAudio(audioFile, translateToEnglish);
@@ -174,9 +200,11 @@ export default function Home() {
       playChime();
       const preview = text.slice(0, 50) + (text.length > 50 ? '...' : '');
       toast.success('Transcription Complete', {
+        id: 'transcription',
         description: `${audioFile.name}\n"${preview}"`,
       });
     } catch (err) {
+      toast.dismiss('transcription');
       setError(err instanceof Error ? err.message : 'Failed to transcribe audio');
     } finally {
       setLoading(false);
@@ -264,50 +292,68 @@ export default function Home() {
               </Button>
             </div>
           ) : (
-            <Dropzone
-              accept={{
-                'audio/*': ['.mp3', '.wav', '.ogg', '.m4a', '.flac'],
-              }}
-              maxSize={25 * 1024 * 1024} // 25MB
-              onDrop={handleDrop}
-              src={audioFile ? [audioFile] : undefined}
-              className="min-h-[200px]"
-            >
-              <DropzoneEmptyState />
-              <DropzoneContent />
-            </Dropzone>
-          )}
-
-          {audioFile && !autoTranscribe && (
-            <div className="flex gap-2">
-              <Button
-                onClick={handleTranscribe}
+            <div className="relative">
+              {audioFile && (
+                <div className="absolute top-2 right-2 z-10 flex gap-2">
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      downloadAudioFile();
+                    }}
+                    variant="secondary"
+                    size="icon"
+                    className="h-8 w-8 cursor-pointer bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      clearAudioFile();
+                    }}
+                    variant="secondary"
+                    size="icon"
+                    className="h-8 w-8 cursor-pointer bg-white dark:bg-zinc-800 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+              <Dropzone
+                accept={{
+                  'audio/*': ['.mp3', '.wav', '.ogg', '.m4a', '.flac', '.webm'],
+                }}
+                maxSize={25 * 1024 * 1024} // 25MB
+                onDrop={handleDrop}
+                src={audioFile ? [audioFile] : undefined}
+                className="min-h-[200px]"
                 disabled={loading}
-                className="flex-1"
-                size="lg"
               >
-                {loading ? 'Transcribing...' : 'Transcribe Audio'}
-              </Button>
-              <Button
-                onClick={downloadAudioFile}
-                variant="outline"
-                size="lg"
-                className="cursor-pointer border-zinc-300 dark:border-zinc-700"
-              >
-                <Download className="h-5 w-5" />
-              </Button>
+                {loading ? (
+                  <div className="flex flex-col items-center justify-center gap-3">
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-200 border-t-zinc-900 dark:border-zinc-700 dark:border-t-zinc-100" />
+                    <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                      Uploading and transcribing...
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <DropzoneEmptyState />
+                    <DropzoneContent />
+                  </>
+                )}
+              </Dropzone>
             </div>
           )}
 
-          {audioFile && autoTranscribe && (
+          {audioFile && !autoTranscribe && (
             <Button
-              onClick={downloadAudioFile}
-              variant="outline"
+              onClick={handleTranscribe}
+              disabled={loading}
+              className="w-full"
               size="lg"
-              className="w-full cursor-pointer border-zinc-300 dark:border-zinc-700"
             >
-              <Download className="mr-2 h-5 w-5" />
-              Download Audio File
+              {loading ? 'Transcribing...' : 'Transcribe Audio'}
             </Button>
           )}
         </div>
@@ -319,8 +365,22 @@ export default function Home() {
         )}
 
         {transcription && (
-          <div className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900">
-            <h2 className="mb-3 font-semibold text-lg text-black dark:text-zinc-50">
+          <div className="rounded-lg border border-zinc-200 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900 relative">
+            <div className="absolute top-4 right-4">
+              <Button
+                onClick={copyToClipboard}
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 cursor-pointer"
+              >
+                {copied ? (
+                  <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+            <h2 className="mb-3 font-semibold text-lg text-black dark:text-zinc-50 pr-10">
               Transcription
             </h2>
             <p className="text-zinc-700 dark:text-zinc-300 leading-relaxed">
